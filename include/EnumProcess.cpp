@@ -149,6 +149,69 @@ namespace process_helper {
 		delete[] commandLineContents;
 	}
 
+	//添加的获取进程所属用户的方法，这里面还获取了进程名，先不精简
+	INT8 GetProcessNameAndID(DWORD processID,TCHAR szUserName[])
+	{
+		INT8 code = 0;
+
+		TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
+		// Get a handle to the process.
+
+		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION |
+			PROCESS_VM_READ,
+			FALSE, processID);
+
+		// Get the process name.
+
+		if (NULL != hProcess)
+		{
+			HMODULE hMod;
+			DWORD cbNeeded;
+
+			if (EnumProcessModules(hProcess, &hMod, sizeof(hMod),
+				&cbNeeded))
+			{
+				GetModuleBaseName(hProcess, hMod, szProcessName,
+					sizeof(szProcessName) / sizeof(TCHAR));
+			}
+			HANDLE hToken = NULL;
+			BOOL bResult = FALSE;
+			DWORD dwSize = 0;
+			//TCHAR szUserName[MAX_PATH] = { 0 };
+			TCHAR szDomain[MAX_PATH] = { 0 };
+			DWORD dwDomainSize = MAX_PATH;
+			DWORD dwNameSize = MAX_PATH;
+			SID_NAME_USE snu;
+			PTOKEN_USER pTokenUser = NULL;
+			if (OpenProcessToken(hProcess, TOKEN_QUERY, &hToken))
+			{
+				if (!GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize))
+				{
+					if (ERROR_INSUFFICIENT_BUFFER == GetLastError())
+					{
+						pTokenUser = (PTOKEN_USER)HeapAlloc(GetProcessHeap(), 0, dwSize);
+						if (pTokenUser)
+						{
+							if (GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize))
+							{
+								code = LookupAccountSid(NULL, pTokenUser->User.Sid, szUserName, &dwNameSize, szDomain, &dwDomainSize, &snu);
+								/*if (0 != LookupAccountSid(NULL, pTokenUser->User.Sid, szUserName, &dwNameSize, szDomain, &dwDomainSize, &snu))
+								{
+									_tprintf(TEXT("%s  (PID: %u) UserName: %s\n"), szProcessName, processID, szUserName);
+								}*/
+							}
+							HeapFree(GetProcessHeap(), 0, pTokenUser);
+						}
+					}
+				}
+			}
+			CloseHandle(hProcess);
+		}
+		return code;
+		// Print the process name and identifier.
+	}
+
+
 	process_info describe_pid(DWORD pid, bool deep_scan, bool ignore_unreadable) {
 		process_info entry;
 		entry.pid = pid;
@@ -259,6 +322,16 @@ namespace process_helper {
 
 			if (PebBaseAddress)
 				nscpGetCommandLine(handle, PebBaseAddress, entry);
+
+			//deep_scan??先放到这里吧！
+			TCHAR szUserName[MAX_PATH] = { 0 };
+			if (GetProcessNameAndID(entry.pid, szUserName)) {
+				entry.userid = utf8::cvt<std::string>(std::wstring(szUserName));
+			}
+			else {
+				entry.userid = "unknown";
+			}
+			
 		}
 
 		HMODULE hMod;
@@ -280,6 +353,9 @@ namespace process_helper {
 		}
 		return entry;
 	}
+
+
+
 
 	process_list enumerate_processes(bool ignore_unreadable, bool find_16bit, bool deep_scan, error_reporter *error_interface, unsigned int buffer_size) {
 		try {
@@ -416,7 +492,7 @@ namespace process_helper {
 			if (error_interface != NULL)
 				error_interface->report_error(e.reason());
 		}
-
+		
 		unsigned long long kernel_time = 0;
 		unsigned long long user_time = 0;
 		unsigned long long idle_time = 0;
@@ -436,7 +512,9 @@ namespace process_helper {
 			user_time = (userTime.dwHighDateTime * ((unsigned long long)MAXDWORD + 1)) + (unsigned long long)userTime.dwLowDateTime - user_time;
 			idle_time = (idleTime.dwHighDateTime * ((unsigned long long)MAXDWORD + 1)) + (unsigned long long)idleTime.dwLowDateTime - idle_time;
 		}
-		long long total_time = kernel_time + user_time + idle_time;
+		//GetSystemTimes 的 kernelTime 包括 idleTime
+		//long long total_time = kernel_time + user_time + idle_time;
+		//error_interface->report_debug("cpu delta :total :" + str::xtos((kernel_time + user_time - idle_time) * 100 / (kernel_time + user_time)) + "," + str::xtos(kernel_time) + "," + str::xtos(user_time) + "," + str::xtos(idle_time));
 
 		process_map p2 = get_process_data(ignore_unreadable, error_interface);
 		BOOST_FOREACH(process_map::value_type v1, p1) {
@@ -447,8 +525,10 @@ namespace process_helper {
 				continue;
 			}
 			v2->second -= v1.second;
-			v2->second.make_cpu_delta(kernel_time, user_time, total_time);
+			v2->second.make_cpu_delta(kernel_time, user_time, kernel_time + user_time);
 			ret.push_back(v2->second);
+
+			//error_interface->report_debug("cpu delta :" + v2->second.exe.value + "(" + str::xtos(v2->second.pid) + ")" + str::xtos(v2->second.total_time));
 		}
 
 		try {

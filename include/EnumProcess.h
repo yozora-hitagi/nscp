@@ -191,6 +191,10 @@ namespace process_helper {
 		INT_GETTER(PagefileUsage);
 		INT_GETTER(PeakPagefileUsage);
 
+		//add tcp and user
+		string_var userid;
+		STR_GETTER(userid);
+
 		void set_error(std::string msg) {
 			has_error = true;
 			error = msg;

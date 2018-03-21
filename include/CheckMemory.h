@@ -21,6 +21,7 @@
 
 #include <windows.h>
 #include <error/error.hpp>
+#include <Psapi.h>
 
 
 typedef BOOL (WINAPI *PFGlobalMemoryStatusEx)(LPMEMORYSTATUSEX lpBuffer);
@@ -59,6 +60,8 @@ public:
 		memType virt;
 		memType page;
 		double availExtendedVirtual;
+
+		//SIZE_T SystemCache;
 	} memData;
 
 public:
@@ -97,6 +100,13 @@ public:
 
 	memData getMemoryStatus() {
 		memData ret;
+
+		//https://msdn.microsoft.com/en-us/library/windows/desktop/aa965225(v=vs.85).aspx
+		/*PERFORMANCE_INFORMATION stPerformance = { 0 };
+		int cb = sizeof(stPerformance);
+		GetPerformanceInfo(&stPerformance, cb);
+		ret.SystemCache = stPerformance.SystemCache * stPerformance.PageSize;*/
+
 		if (method_ == CheckMemMethod::Extended) {
 			MEMORYSTATUSEX buffer;
 			buffer.dwLength = sizeof(buffer);

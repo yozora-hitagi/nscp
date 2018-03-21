@@ -258,6 +258,8 @@ namespace memory_checks {
 				return nscapi::protobuf::functions::set_response_bad(*response, e.reason());
 			}
 
+			//NSC_DEBUG_MSG_STD("SystemCache : " + str::xtos(mem_data.SystemCache));
+
 			BOOST_FOREACH(const std::string &type, types) {
 				unsigned long long used(0), total(0);
 				if (type == "committed") {

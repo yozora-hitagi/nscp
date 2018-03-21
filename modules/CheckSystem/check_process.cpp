@@ -56,6 +56,8 @@ namespace check_proc_filter {
 			("error", boost::bind(&filter_obj::get_error, _1), "Any error messages associated with fetching info")
 			("command_line", boost::bind(&filter_obj::get_command_line, _1), "Command line of process (not always available)")
 			("legacy_state", boost::bind(&filter_obj::get_legacy_state_s, _1), "Get process status (for legacy use via check_nt only)")
+
+			("userid", boost::bind(&filter_obj::get_userid, _1), "Get process user id")
 			;
 		registry_.add_int()
 			("pid", boost::bind(&filter_obj::get_pid, _1), "Process id")

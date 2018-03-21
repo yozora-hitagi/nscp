@@ -162,6 +162,7 @@ namespace check_pdh {
 		typedef std::map<std::string, std::string> counter_list;
 		counter_list named_counters;
 
+
 		bool has_counter = false;
 		std::list<std::wstring> to_check;
 		BOOST_FOREACH(std::string &counter, counters) {
@@ -224,6 +225,7 @@ namespace check_pdh {
 				return nscapi::protobuf::functions::set_response_bad(*response, "Failed to add counter: " + utf8::utf8_from_native(e.what()));
 			}
 		}
+
 		if (!free_counters.empty()) {
 			try {
 				pdh.open();
